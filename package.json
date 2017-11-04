@@ -1,13 +1,13 @@
 {
   "name": "mallory-glass",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "mallory-glass",
   "license": "MIT",
-  "repository": "",
+  "repository": "https://github.com/mthx/mallory-glass",
   "author": {
-    "name": "",
-    "email": "",
-    "url": ""
+    "name": "Matt Hillsdon",
+    "email": "matt@hillsdon.net",
+    "url": "http://matt.hillsdon.net"
   },
   "keywords": [
     ""

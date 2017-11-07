@@ -1,5 +1,8 @@
-import { IncomingMessage, Server, ServerResponse } from 'http';
-import { Socket } from 'net';
+import { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, RequestOptions, Server, ServerResponse } from 'http';
+import * as http from 'http';
+import { effectiveRequestUrl } from './http-util';
+
+import { parse as parseUrl, resolve as resolveUrl, Url } from 'url';
 
 export interface IProxyOptions {
   port: number;
@@ -13,6 +16,10 @@ function defaultOptions(options: Partial<IProxyOptions>): IProxyOptions {
   };
 }
 
+interface IStringHeaders {
+  [header: string]: string | string[];
+}
+
 export class Proxy {
 
   private options: IProxyOptions;
@@ -21,11 +28,7 @@ export class Proxy {
   constructor(options: Partial<IProxyOptions>) {
     this.options = defaultOptions(options);
     this.server = new Server();
-    this.server.on('request', (request: IncomingMessage, response: ServerResponse) => {
-        response.write('Hello, World!');
-        response.end();
-      }
-    );
+    this.server.on('request', this.handleProxyRequest.bind(this));
   }
 
   public listen(): Promise<void> {
@@ -42,16 +45,67 @@ export class Proxy {
   }
 
   public url(): string {
-    return 'http://' + this.hostname() + ':' + this.port();
+    return 'http://' + this.hostAndPort();
   }
 
-  private hostname(): string {
+  public hostname(): string {
     return this.options.hostname;
   }
 
-  private port(): number | undefined {
+  public port(): number | undefined {
     const address = this.server.address();
     return address ? address.port : undefined;
+  }
+
+  private hostAndPort(): string {
+    return this.hostname() + ':' + this.port();
+  }
+
+  private outgoingRequestOptions(effectiveRequestUri: Url, incomingRequest: IncomingMessage): RequestOptions {
+    const {host, hostname, path, port, protocol} = effectiveRequestUri;
+    const {method, headers: incomingHeaders} = incomingRequest;
+    return {
+      headers: this.incomingHeadersToOutgoingHeaders(incomingHeaders, host as string),
+      hostname, method, path, port, protocol,
+    };
+  }
+
+  private handleProxyRequest(incomingRequest: IncomingMessage, incomingResponse: ServerResponse): void {
+    const effectiveRequestUri = this.effectiveRequestUri(incomingRequest);
+    const options = this.outgoingRequestOptions(effectiveRequestUri, incomingRequest);
+
+    const outgoingRequest = http.request(options, (outgoingResponse: IncomingMessage) => {
+      const newHeaders = this.outgoingResponseHeadersToIncomingResponseHeaders(outgoingResponse.headers);
+      Object.keys(newHeaders).forEach(h => incomingResponse.setHeader(h, newHeaders[h]));
+      outgoingResponse.pipe(incomingResponse);
+    });
+    incomingRequest.pipe(outgoingRequest);
+    incomingRequest.on('abort', () => outgoingRequest.abort());
+    incomingRequest.on('error', e => outgoingRequest.abort());
+    outgoingRequest.on('error', e => {
+      if (!incomingResponse.headersSent) {
+        incomingResponse.writeHead(502);
+      }
+      incomingResponse.end();
+    })
+  }
+
+  private incomingHeadersToOutgoingHeaders(headers: IncomingHttpHeaders, newHostHeader: string): IStringHeaders {
+    // We at least need to strip hop-by-hop headers.
+    return {... headers, host: newHostHeader};
+  }
+
+  private outgoingResponseHeadersToIncomingResponseHeaders(headers: IncomingHttpHeaders): IStringHeaders {
+    // We at least need to strip hop-by-hop headers.
+    return {... headers};
+  }
+
+  private effectiveRequestUri(incomingRequest: IncomingMessage): Url {
+    // https://tools.ietf.org/html/draft-ietf-httpbis-p1-messaging-14#section-4.2
+    // TODO: parse failures
+    const requestUrl = incomingRequest.url as string;
+    const hostHeader = incomingRequest.headers.host as string;
+    return effectiveRequestUrl('http:', requestUrl, hostHeader);
   }
 
 }

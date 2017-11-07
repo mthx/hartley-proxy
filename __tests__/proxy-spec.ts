@@ -4,18 +4,25 @@ import { BackendServer } from '../src/backend-server';
 import { Proxy } from '../src/proxy';
 
 describe('proxy', () => {
-  it('proxies a simple request', async () => {
-    const backend = new BackendServer();
-    const proxy = new Proxy({});
 
-    await Promise.all([proxy.listen(), backend.listen()]);
+  const backend = new BackendServer();
+  const proxy = new Proxy({});
 
-    const {response, body} = await proxyRequest(proxy, backend);
+  beforeEach(async () => await Promise.all([proxy.listen(), backend.listen()]))
+  afterEach(async () => await Promise.all([proxy.close(), backend.close()]));
+
+  it('proxies a simple request specified via the path', async () => {
+    const {response, body} = await proxyRequest(proxy, {path: backend.url()});
     expect(response.statusCode).toEqual(200);
     expect(body).toEqual('Hello, World!');
-
-    await Promise.all([proxy.close(), backend.close()]);
   });
+
+  it('proxies a simple request specified with relative path and host header', async () => {
+    const {response, body} = await proxyRequest(proxy, {headers: {host: backend.hostAndPort()}, path: '/'});
+    expect(response.statusCode).toEqual(200);
+    expect(body).toEqual('Hello, World!');
+  });
+
 });
 
 interface IRequestResult {
@@ -23,18 +30,15 @@ interface IRequestResult {
   body: string;
 }
 
-async function proxyRequest(proxy: Proxy, backend: BackendServer): Promise<IRequestResult> {
+async function proxyRequest(proxy: Proxy, options: http.RequestOptions): Promise<IRequestResult> {
   return new Promise<IRequestResult>((resolve, reject) => {
-    const options: http.RequestOptions = {
-      headers: {
-        host: backend.hostAndPort(),
-      },
-      hostname: 'localhost',
-      path: backend.url(),
+    const proxyOptions: http.RequestOptions = {
+      ... options,
+      hostname: proxy.hostname(),
       port: proxy.port(),
     };
     let body = '';
-    const request = http.request(options, (response: http.IncomingMessage) => {
+    const request = http.request(proxyOptions, (response: http.IncomingMessage) => {
       response.on('data', chunk => body += chunk.toString());
       response.on('end', () => resolve({response, body}));
     });

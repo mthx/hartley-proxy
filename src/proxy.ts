@@ -1,5 +1,6 @@
 import { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, RequestOptions, Server, ServerResponse } from 'http';
 import * as http from 'http';
+import { effectiveRequestUrl } from './http-util';
 
 import { parse as parseUrl, resolve as resolveUrl, Url } from 'url';
 
@@ -79,7 +80,7 @@ export class Proxy {
       outgoingResponse.pipe(incomingResponse);
     });
     incomingRequest.pipe(outgoingRequest);
-    incomingRequest.on('abort', e => outgoingRequest.abort());
+    incomingRequest.on('abort', () => outgoingRequest.abort());
     incomingRequest.on('error', e => outgoingRequest.abort());
     outgoingRequest.on('error', e => {
       if (!incomingResponse.headersSent) {
@@ -102,16 +103,9 @@ export class Proxy {
   private effectiveRequestUri(incomingRequest: IncomingMessage): Url {
     // https://tools.ietf.org/html/draft-ietf-httpbis-p1-messaging-14#section-4.2
     // TODO: parse failures
-    let url = parseUrl(incomingRequest.url as string);
-    if (url.host) {
-      return url;
-    }
-    if (url.path === '*') {
-      url = parseUrl('');
-    }
-    // TODO: missing or multiple host headers.
-    const host = incomingRequest.headers.host as string;
-    return parseUrl(resolveUrl('http:' + '://' + host, incomingRequest.url as string));
+    const requestUrl = incomingRequest.url as string;
+    const hostHeader = incomingRequest.headers.host as string;
+    return effectiveRequestUrl('http:', requestUrl, hostHeader);
   }
 
 }

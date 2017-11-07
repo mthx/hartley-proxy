@@ -1,34 +1,7 @@
 import * as http from 'http';
-import * as fetch from 'node-fetch';
-import * as fs from 'fs';
 
 import { BackendServer } from '../src/backend-server';
 import { Proxy } from '../src/proxy';
-
-interface IRequestResult {
-  response: http.IncomingMessage;
-  body: string;
-}
-
-async function proxyRequest(proxy: Proxy, backend: BackendServer): Promise<IRequestResult> {
-  return new Promise<IRequestResult>((resolve, reject) => {
-    const options: http.RequestOptions = {
-      headers: {
-        host: backend.hostAndPort(),
-      },
-      hostname: 'localhost',
-      path: backend.url() + '/fish',
-      port: proxy.port(),
-    };
-    let body = '';
-    const request = http.request(options, (response: http.IncomingMessage) => {
-      response.on('data', chunk => body += chunk.toString());
-      response.on('end', () => resolve({response, body}));
-    });
-    request.on('error', e => reject(e));
-    request.end();
-  });
-}
 
 describe('proxy', () => {
   it('proxies a simple request', async () => {
@@ -44,3 +17,28 @@ describe('proxy', () => {
     await Promise.all([proxy.close(), backend.close()]);
   });
 });
+
+interface IRequestResult {
+  response: http.IncomingMessage;
+  body: string;
+}
+
+async function proxyRequest(proxy: Proxy, backend: BackendServer): Promise<IRequestResult> {
+  return new Promise<IRequestResult>((resolve, reject) => {
+    const options: http.RequestOptions = {
+      headers: {
+        host: backend.hostAndPort(),
+      },
+      hostname: 'localhost',
+      path: backend.url(),
+      port: proxy.port(),
+    };
+    let body = '';
+    const request = http.request(options, (response: http.IncomingMessage) => {
+      response.on('data', chunk => body += chunk.toString());
+      response.on('end', () => resolve({response, body}));
+    });
+    request.on('error', e => reject(e));
+    request.end();
+  });
+}

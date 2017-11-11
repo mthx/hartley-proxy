@@ -1,6 +1,6 @@
 import { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, RequestOptions, Server, ServerResponse } from 'http';
 import * as http from 'http';
-import { effectiveRequestUrl } from './http-util';
+import { effectiveRequestUrl } from './http-defined';
 
 import { parse as parseUrl, resolve as resolveUrl, Url } from 'url';
 

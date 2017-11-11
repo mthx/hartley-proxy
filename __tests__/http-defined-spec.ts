@@ -1,7 +1,7 @@
 import * as http from 'http';
 import {parse as parseUrl} from 'url';
 
-import { effectiveRequestUrl } from '../src/http-util';
+import { effectiveRequestUrl } from '../src/http-defined';
 
 describe('effectiveRequestUrl', () => {
   it('missing colon is error', () => {

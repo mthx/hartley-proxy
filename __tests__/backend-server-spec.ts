@@ -7,7 +7,7 @@ describe('BackendServer', () => {
 
   const backend = new BackendServer();
 
-  beforeEach(async () => await backend.listen())
+  beforeEach(async () => await backend.listen());
 
   it('says hello', async () => {
     const response = await httpRequest(backend.url());

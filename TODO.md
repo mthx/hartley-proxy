@@ -15,7 +15,7 @@
 - fancier cli with options / help
 - electron or browser app to display recent requests
 
-# Links etc.
+## Links etc.
 
 - https://nodejs.org/api/http.html
 - https://tools.ietf.org/html/draft-ietf-httpbis-p1-messaging-14#section-7.1.3

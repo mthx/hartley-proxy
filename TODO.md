@@ -1,9 +1,9 @@
 # TODO
 
+- use raw headers only as otherwise we lose duplicates
 - find a way to test multiple header input
-- strip headers
-- fiddle with agent
-- add proxy-specific headers
+- strip headers?  not sure we need to given we pass everything through.
+- add via header
 
 - request tracking
 - recent request broadcast via websocket?

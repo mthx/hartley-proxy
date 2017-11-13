@@ -1,5 +1,5 @@
 import {PassThrough} from 'stream';
-import {BufferWritable} from '../src/writables';
+import {BufferReadable, BufferWritable} from '../src/buffer-streams';
 
 describe('BufferWritable', () => {
 
@@ -28,6 +28,20 @@ describe('BufferWritable', () => {
     // Special case in the impl.
     source.end('foo');
     expect(dest.toBuffer()).not.toBe(dest.toBuffer());
+  })
+
+})
+
+describe('BufferReadable', () => {
+
+  it('works', (done) => {
+    const writable = new BufferWritable();
+    writable.on('finish', () => {
+      expect(writable.toBuffer().toString()).toEqual('content');
+      done();
+    });
+    const readable = new BufferReadable(Buffer.from('content'));
+    readable.pipe(writable);
   })
 
 })

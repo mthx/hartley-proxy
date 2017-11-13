@@ -1,5 +1,6 @@
-import { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, RequestOptions, Server, ServerResponse } from 'http';
 import * as http from 'http';
+import { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, RequestOptions, Server, ServerResponse } from 'http';
+import { BufferWritable } from './buffer-streams';
 
 /**
  * A stub server used for testing the proxy.
@@ -10,11 +11,14 @@ export class BackendServer {
 
   constructor() {
     this.server = new Server((request: IncomingMessage, response: ServerResponse) => {
+      const bufferWritable = new BufferWritable();
       response.writeHead(200, undefined, {'Content-Type': 'text/plain'});
-      response.write('Hello, World!');
-      response.end();
+      request.pipe(bufferWritable);
+      bufferWritable.on('finish', () => {
+        response.end(('Hello ' + bufferWritable.toBuffer().toString()).trim());
+      });
     });
-  }
+}
 
   public listen(): Promise<void> {
     return new Promise((resolve, reject) => {

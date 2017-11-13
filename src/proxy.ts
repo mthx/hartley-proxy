@@ -81,7 +81,7 @@ export class Proxy {
     });
     incomingRequest.pipe(outgoingRequest);
     incomingRequest.on('abort', () => outgoingRequest.abort());
-    incomingRequest.on('error', e => outgoingRequest.abort());
+    incomingRequest.on('error', () => outgoingRequest.abort());
     outgoingRequest.on('error', e => {
       if (!incomingResponse.headersSent) {
         incomingResponse.writeHead(502);

@@ -27,7 +27,8 @@
     "test": "jest",
     "coverage": "jest --coverage",
     "watch": "npm run build -- --watch",
-    "watch:test": "jest --watch"
+    "watch:test": "jest --watch",
+    "start": "ts-node src/cli.ts"
   },
   "dependencies": {},
   "devDependencies": {

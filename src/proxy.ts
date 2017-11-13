@@ -71,6 +71,10 @@ export class Proxy {
   }
 
   private handleProxyRequest(incomingRequest: IncomingMessage, incomingResponse: ServerResponse): void {
+    if (!this.validateRequest(incomingRequest, incomingResponse)) {
+      return;
+    }
+
     const effectiveRequestUri = this.effectiveRequestUri(incomingRequest);
     const options = this.outgoingRequestOptions(effectiveRequestUri, incomingRequest);
 
@@ -88,6 +92,28 @@ export class Proxy {
       }
       incomingResponse.end();
     })
+  }
+
+  private validateRequest(incomingRequest: IncomingMessage, incomingResponse: ServerResponse): boolean {
+    // nodejs has already collapsed headers expected to have a single value but we check the important ones for duplicates.
+    const counts: {[header: string]: number} = {'content-length': 0, 'host': 0};
+    incomingRequest.rawHeaders.forEach((value, i) => {
+      if (i % 2 === 0) {
+        const lower = value.toLowerCase();
+        const count = counts[lower];
+        if (typeof count !== 'undefined') {
+          counts[lower] = count + 1;
+        }
+      }
+    });
+
+    const repeated = Object.keys(counts).filter(k => counts[k] > 1);
+    if (repeated.length > 0) {
+      incomingResponse.writeHead(400, 'Invalid headers', {'content-type': 'text/plain'});
+      incomingResponse.end('The following headers may not be repeated in proxy requests: ' + repeated.join(', '));
+      return false;
+    }
+    return true;
   }
 
   private incomingHeadersToOutgoingHeaders(headers: IncomingHttpHeaders, newHostHeader: string): IStringHeaders {

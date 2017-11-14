@@ -1,5 +1,6 @@
 import { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, RequestOptions, Server, ServerResponse } from 'http';
 import * as http from 'http';
+import { IHeaderMap, parseRawHeaders } from './headers';
 import { effectiveRequestUrl } from './http-defined';
 
 import { parse as parseUrl, resolve as resolveUrl, Url } from 'url';
@@ -14,10 +15,6 @@ function defaultOptions(options: Partial<IProxyOptions>): IProxyOptions {
     hostname: options.hostname || 'localhost',
     port: options.port || 0,
   };
-}
-
-interface IStringHeaders {
-  [header: string]: string | string[];
 }
 
 export class Proxy {
@@ -61,25 +58,34 @@ export class Proxy {
     return this.hostname() + ':' + this.port();
   }
 
-  private outgoingRequestOptions(effectiveRequestUri: Url, incomingRequest: IncomingMessage): RequestOptions {
+  private outgoingRequestOptions(effectiveRequestUri: Url, method: string, incomingHeaders: IHeaderMap): RequestOptions {
     const {host, hostname, path, port, protocol} = effectiveRequestUri;
-    const {method, headers: incomingHeaders} = incomingRequest;
+    const outgoingHeaders = {... incomingHeaders, host: host as string};
     return {
-      headers: this.incomingHeadersToOutgoingHeaders(incomingHeaders, host as string),
+      headers: outgoingHeaders,
       hostname, method, path, port, protocol,
     };
   }
 
   private handleProxyRequest(incomingRequest: IncomingMessage, incomingResponse: ServerResponse): void {
-    if (!this.validateRequest(incomingRequest, incomingResponse)) {
+    const incomingHeaders = parseRawHeaders(incomingRequest.rawHeaders);
+    if (incomingHeaders.host && incomingHeaders.host.length > 1) {
+      this.reject(incomingResponse, 'Multiple host headers.');
+      return;
+    }
+    if (incomingHeaders['content-length'] && incomingHeaders['content-length'].length > 1) {
+      this.reject(incomingResponse, 'Multiple content-length headers.');
       return;
     }
 
-    const effectiveRequestUri = this.effectiveRequestUri(incomingRequest);
-    const options = this.outgoingRequestOptions(effectiveRequestUri, incomingRequest);
+    const options = this.outgoingRequestOptions(
+      effectiveRequestUrl('http:', incomingRequest.url as string, incomingHeaders.host[0]),
+      incomingRequest.method as string,
+      incomingHeaders
+    );
 
     const outgoingRequest = http.request(options, (outgoingResponse: IncomingMessage) => {
-      const newHeaders = this.outgoingResponseHeadersToIncomingResponseHeaders(outgoingResponse.headers);
+      const newHeaders = parseRawHeaders(outgoingResponse.rawHeaders);
       Object.keys(newHeaders).forEach(h => incomingResponse.setHeader(h, newHeaders[h]));
       outgoingResponse.pipe(incomingResponse);
     });
@@ -94,44 +100,9 @@ export class Proxy {
     })
   }
 
-  private validateRequest(incomingRequest: IncomingMessage, incomingResponse: ServerResponse): boolean {
-    // nodejs has already collapsed headers expected to have a single value but we check the important ones for duplicates.
-    const counts: {[header: string]: number} = {'content-length': 0, 'host': 0};
-    incomingRequest.rawHeaders.forEach((value, i) => {
-      if (i % 2 === 0) {
-        const lower = value.toLowerCase();
-        const count = counts[lower];
-        if (typeof count !== 'undefined') {
-          counts[lower] = count + 1;
-        }
-      }
-    });
-
-    const repeated = Object.keys(counts).filter(k => counts[k] > 1);
-    if (repeated.length > 0) {
-      incomingResponse.writeHead(400, 'Invalid headers', {'content-type': 'text/plain'});
-      incomingResponse.end('The following headers may not be repeated in proxy requests: ' + repeated.join(', '));
-      return false;
-    }
-    return true;
-  }
-
-  private incomingHeadersToOutgoingHeaders(headers: IncomingHttpHeaders, newHostHeader: string): IStringHeaders {
-    // We at least need to strip hop-by-hop headers.
-    return {... headers, host: newHostHeader};
-  }
-
-  private outgoingResponseHeadersToIncomingResponseHeaders(headers: IncomingHttpHeaders): IStringHeaders {
-    // We at least need to strip hop-by-hop headers.
-    return {... headers};
-  }
-
-  private effectiveRequestUri(incomingRequest: IncomingMessage): Url {
-    // https://tools.ietf.org/html/draft-ietf-httpbis-p1-messaging-14#section-4.2
-    // TODO: parse failures
-    const requestUrl = incomingRequest.url as string;
-    const hostHeader = incomingRequest.headers.host as string;
-    return effectiveRequestUrl('http:', requestUrl, hostHeader);
+  private reject(incomingResponse: ServerResponse, message: string): void {
+    incomingResponse.writeHead(400, 'Bad request', {'content-type': 'text/plain'});
+    incomingResponse.end(message);
   }
 
 }

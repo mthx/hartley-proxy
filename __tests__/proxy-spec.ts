@@ -16,14 +16,21 @@ describe('proxy', () => {
 
   it('proxies a simple request specified via the path', async () => {
     const {response, body} = await proxyRequest(proxy, {path: backend.url()});
-    expect(response.statusCode).toEqual(200);
     expect(body.toString()).toEqual('Hello');
+    expect(response.statusCode).toEqual(200);
   });
 
   it('proxies a simple request specified with relative path and host header', async () => {
     const {response, body} = await proxyRequest(proxy, {headers: {host: backend.hostAndPort()}, path: '/'});
-    expect(response.statusCode).toEqual(200);
     expect(body.toString()).toEqual('Hello');
+    expect(response.statusCode).toEqual(200);
+  });
+
+  it('proxies a request with a body', async () => {
+    const requestBody = new BufferReadable(Buffer.from('via the proxy'));
+    const {response, body} = await proxyRequest(proxy, {method: 'PUT', headers: {host: backend.hostAndPort()}, path: '/'}, requestBody);
+    expect(body.toString()).toEqual('Hello via the proxy');
+    expect(response.statusCode).toEqual(200);
   });
 
 });

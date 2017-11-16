@@ -99,7 +99,7 @@ export class Proxy {
     incomingRequest.pipe(outgoingRequest);
     incomingRequest.on('abort', () => outgoingRequest.abort());
     incomingRequest.on('error', () => outgoingRequest.abort());
-    outgoingRequest.on('error', e => {
+    outgoingRequest.on('error', (e: any) => {
       if (!incomingResponse.headersSent) {
         incomingResponse.writeHead(502);
       }

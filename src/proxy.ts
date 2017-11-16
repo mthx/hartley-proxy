@@ -1,6 +1,5 @@
 import { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, RequestOptions, Server, ServerResponse } from 'http';
 import * as http from 'http';
-import * as https from 'https';
 import { IHeaderMap, parseRawHeaders } from './headers';
 import { effectiveRequestUrl } from './http-defined';
 
@@ -85,13 +84,7 @@ export class Proxy {
       incomingHeaders
     );
 
-    const module: any = ({'http:': http, 'https:': https} as any)[options.protocol as string];
-    if (!module) {
-      this.reject(incomingResponse, 'Unsupported protocol: ' + options.protocol);
-      return;
-    }
-
-    const outgoingRequest = module.request(options, (outgoingResponse: IncomingMessage) => {
+    const outgoingRequest = http.request(options, (outgoingResponse: IncomingMessage) => {
       const newHeaders = parseRawHeaders(outgoingResponse.rawHeaders);
       Object.keys(newHeaders).forEach(h => incomingResponse.setHeader(h, newHeaders[h]));
       outgoingResponse.pipe(incomingResponse);

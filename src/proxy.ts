@@ -1,9 +1,10 @@
 import { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, RequestOptions, Server, ServerResponse } from 'http';
 import * as http from 'http';
+import * as net from 'net';
+import { parse as parseUrl, resolve as resolveUrl, Url } from 'url';
+
 import { IHeaderMap, parseRawHeaders } from './headers';
 import { effectiveRequestUrl } from './http-defined';
-
-import { parse as parseUrl, resolve as resolveUrl, Url } from 'url';
 
 export interface IProxyOptions {
   port: number;
@@ -26,6 +27,7 @@ export class Proxy {
     this.options = defaultOptions(options);
     this.server = new Server();
     this.server.on('request', this.handleProxyRequest.bind(this));
+    this.server.on('connect', this.handleConnect.bind(this));
   }
 
   public listen(): Promise<void> {
@@ -65,6 +67,24 @@ export class Proxy {
       headers: outgoingHeaders,
       hostname, method, path, port, protocol,
     };
+  }
+
+  private handleConnect(request: IncomingMessage, incomingSocket: net.Socket, head: Buffer): void {
+    // For now this makes a direct connection.  To actually intercept HTTPs traffic,
+    // we need to proxy to our own https.Server that has an SNI context per host/port
+    // with a certificate we generate when first encountering that host (with a CA cert we can import
+    // in the browser).
+    const {hostname, port} = parseUrl('http://' + request.url!);
+    const outgoingSocket = net.connect(parseInt(port!, 10), hostname, () => {
+      incomingSocket.write(
+        'HTTP/1.1 200 Connection Established\r\n' +
+        '\r\n'
+      );
+
+      outgoingSocket.write(head);
+      outgoingSocket.pipe(incomingSocket);
+      incomingSocket.pipe(outgoingSocket);
+    });
   }
 
   private handleProxyRequest(incomingRequest: IncomingMessage, incomingResponse: ServerResponse): void {

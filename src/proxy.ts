@@ -1,10 +1,12 @@
-import { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, RequestOptions, Server, ServerResponse } from 'http';
+import { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, RequestOptions, ServerResponse } from 'http';
 import * as http from 'http';
+import * as https from 'https';
 import * as net from 'net';
-import { parse as parseUrl, resolve as resolveUrl, Url } from 'url';
+import * as url from 'url';
 
 import { IHeaderMap, parseRawHeaders } from './headers';
 import { effectiveRequestUrl } from './http-defined';
+import { ServerLifecycle } from './server-lifecycle';
 
 export interface IProxyOptions {
   port: number;
@@ -21,60 +23,45 @@ function defaultOptions(options: Partial<IProxyOptions>): IProxyOptions {
 export class Proxy {
 
   private options: IProxyOptions;
-  private server: Server;
+
+  // A HTTP server acting as a proxy (gateway) on a configured port.
+  private httpServer: ServerLifecycle;
+
+  // A HTTPs server that the HTTP server forwards CONNECT requests to,
+  // after ensuring it has a SNI context for the relevant HOST.  This
+  // allows us to MITM HTTPS.  The server itself acts as a reverse proxy
+  // based on the SNI context.
+  // Port is dynamically allocated is it isn't relevant externally.
+  private httpsServer: ServerLifecycle;
 
   constructor(options: Partial<IProxyOptions>) {
     this.options = defaultOptions(options);
-    this.server = new Server();
-    this.server.on('request', this.handleProxyRequest.bind(this));
-    this.server.on('connect', this.handleConnect.bind(this));
+    this.httpServer = new ServerLifecycle(new http.Server(), this.options);
+    this.httpServer.on('request', this.handleHttpProxyRequest.bind(this));
+    this.httpServer.on('connect', this.handleHttpConnect.bind(this));
+
+    this.httpsServer = new ServerLifecycle(new https.Server(), {port: 0, hostname: '127.0.0.1'});
+    this.httpsServer.on('request', this.handleHttpsReverseProxyRequest.bind(this));
   }
 
-  public listen(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const { port, hostname } = this.options;
-      this.server.listen({ port, hostname }, undefined, resolve);
-    });
+  public listen(): Promise<any> {
+    return Promise.all([this.httpServer.listen(), this.httpsServer.listen()]);
   }
 
-  public close(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.server.close(resolve);
-    });
+  public close(): Promise<any> {
+    return Promise.all([this.httpServer.close(), this.httpsServer.close()]);
   }
 
-  public url(): string {
-    return 'http://' + this.hostAndPort();
+  public url(): url.Url | undefined {
+    return this.httpServer.url();
   }
 
-  public hostname(): string {
-    return this.options.hostname;
-  }
-
-  public port(): number | undefined {
-    const address = this.server.address();
-    return address ? address.port : undefined;
-  }
-
-  private hostAndPort(): string {
-    return this.hostname() + ':' + this.port();
-  }
-
-  private outgoingRequestOptions(effectiveRequestUri: Url, method: string, incomingHeaders: IHeaderMap): RequestOptions {
-    const {host, hostname, path, port, protocol} = effectiveRequestUri;
-    const outgoingHeaders = {... incomingHeaders, host: host as string};
-    return {
-      headers: outgoingHeaders,
-      hostname, method, path, port, protocol,
-    };
-  }
-
-  private handleConnect(request: IncomingMessage, incomingSocket: net.Socket, head: Buffer): void {
+  private handleHttpConnect(request: IncomingMessage, incomingSocket: net.Socket, head: Buffer): void {
     // For now this makes a direct connection.  To actually intercept HTTPs traffic,
     // we need to proxy to our own https.Server that has an SNI context per host/port
     // with a certificate we generate when first encountering that host (with a CA cert we can import
     // in the browser).
-    const {hostname, port} = parseUrl('http://' + request.url!);
+    const {hostname, port} = url.parse('http://' + request.url!);
     const outgoingSocket = net.connect(parseInt(port!, 10), hostname, () => {
       incomingSocket.write(
         'HTTP/1.1 200 Connection Established\r\n' +
@@ -87,24 +74,37 @@ export class Proxy {
     });
   }
 
-  private handleProxyRequest(incomingRequest: IncomingMessage, incomingResponse: ServerResponse): void {
-    const incomingHeaders = parseRawHeaders(incomingRequest.rawHeaders);
-    if (incomingHeaders.host && incomingHeaders.host.length > 1) {
-      this.reject(incomingResponse, 'Multiple host headers.');
-      return;
-    }
-    if (incomingHeaders['content-length'] && incomingHeaders['content-length'].length > 1) {
-      this.reject(incomingResponse, 'Multiple content-length headers.');
+  private handleHttpsReverseProxyRequest(incomingRequest: IncomingMessage, incomingResponse: ServerResponse): void {
+    const incomingHeaders = this.validateIncomingHeaders(incomingRequest, incomingResponse);
+    if (!incomingHeaders) {
       return;
     }
 
-    const options = this.outgoingRequestOptions(
-      effectiveRequestUrl('http:', incomingRequest.url as string, incomingHeaders.host[0]),
-      incomingRequest.method as string,
-      incomingHeaders
-    );
+    const {host} = incomingHeaders;
+    const {method} = incomingRequest;
+    this.proxyRequest({
+      headers: incomingHeaders,
+      host: host[0],
+      method,
+    }, https, incomingRequest, incomingResponse);
+  }
 
-    const outgoingRequest = http.request(options, (outgoingResponse: IncomingMessage) => {
+  private handleHttpProxyRequest(incomingRequest: IncomingMessage, incomingResponse: ServerResponse): void {
+    const incomingHeaders = this.validateIncomingHeaders(incomingRequest, incomingResponse);
+    if (!incomingHeaders) {
+      return;
+    }
+
+    const outgoingUrl = effectiveRequestUrl('http:', incomingRequest.url as string, incomingHeaders.host[0]);
+    this.proxyRequest({
+      headers: {... incomingHeaders, host: outgoingUrl.host},
+      method: incomingRequest.method!,
+      ... outgoingUrl,
+    }, http, incomingRequest, incomingResponse);
+  }
+
+  private proxyRequest(options: any, protocolModule: any, incomingRequest: IncomingMessage, incomingResponse: ServerResponse): void {
+    const outgoingRequest = protocolModule.request(options, (outgoingResponse: IncomingMessage) => {
       const newHeaders = parseRawHeaders(outgoingResponse.rawHeaders);
       Object.keys(newHeaders).forEach(h => incomingResponse.setHeader(h, newHeaders[h]));
       outgoingResponse.pipe(incomingResponse);
@@ -118,6 +118,19 @@ export class Proxy {
       }
       incomingResponse.end();
     })
+  }
+
+  private validateIncomingHeaders(incomingRequest: IncomingMessage, incomingResponse: ServerResponse) {
+    const incomingHeaders = parseRawHeaders(incomingRequest.rawHeaders);
+    if (incomingHeaders.host && incomingHeaders.host.length > 1) {
+      this.reject(incomingResponse, 'Multiple host headers.');
+      return undefined;
+    }
+    if (incomingHeaders['content-length'] && incomingHeaders['content-length'].length > 1) {
+      this.reject(incomingResponse, 'Multiple content-length headers.');
+      return undefined;
+    }
+    return incomingHeaders;
   }
 
   private reject(incomingResponse: ServerResponse, message: string): void {

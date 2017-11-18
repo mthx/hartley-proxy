@@ -22,7 +22,7 @@ describe.only('BackendServer', () => {
 
   it('appends request body to greeting', async () => {
     const input = new BufferReadable(Buffer.from('there!'));
-    const options = {... parseUrl(backend.url()), method: 'POST'};
+    const options = {... backend.url(), method: 'POST'};
     const response = await httpRequest(options, input);
     expect(response.body.toString()).toEqual('Hello there!');
   });

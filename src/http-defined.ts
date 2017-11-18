@@ -2,7 +2,7 @@
  * Functions defined in the HTTP spec.
  */
 
-import { parse as parseUrl, resolve as resolveUrl, Url } from 'url';
+import * as url from 'url';
 
 /**
  * Calculates the effective request URI from the host header and requested URL.
@@ -12,7 +12,7 @@ import { parse as parseUrl, resolve as resolveUrl, Url } from 'url';
  * @param requestUrl The URL requested (possibly absolute).
  * @param hostHeader The host header.
  */
-export function effectiveRequestUrl(requestProtocol: string, requestUrl: string, hostHeader: string): Url {
+export function effectiveRequestUrl(requestProtocol: string, requestUrl: string, hostHeader: string): url.Url {
   if (!requestProtocol.endsWith(':')) {
     throw new Error('Trailing colon required.');
   }
@@ -20,10 +20,10 @@ export function effectiveRequestUrl(requestProtocol: string, requestUrl: string,
     requestUrl = '';
   }
 
-  const url = parseUrl(requestUrl);
-  if (url.host) {
-    return url;
+  const parsed = url.parse(requestUrl);
+  if (parsed.host) {
+    return parsed;
   }
 
-  return parseUrl(resolveUrl(requestProtocol + '//' + hostHeader, requestUrl));
+  return url.parse(url.resolve(requestProtocol + '//' + hostHeader, requestUrl));
 }

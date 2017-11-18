@@ -15,20 +15,20 @@ describe('proxy', () => {
   afterEach(async () => await Promise.all([proxy.close(), backend.close()]));
 
   it('proxies a simple request specified via the path', async () => {
-    const {response, body} = await proxyRequest(proxy, {path: backend.url()});
+    const {response, body} = await proxyRequest(proxy, {path: backend.url().href});
     expect(body.toString()).toEqual('Hello');
     expect(response.statusCode).toEqual(200);
   });
 
   it('proxies a simple request specified with relative path and host header', async () => {
-    const {response, body} = await proxyRequest(proxy, {headers: {host: backend.hostAndPort()}, path: '/'});
+    const {response, body} = await proxyRequest(proxy, {headers: {host: backend.url().host}, path: '/'});
     expect(body.toString()).toEqual('Hello');
     expect(response.statusCode).toEqual(200);
   });
 
   it('proxies a request with a body', async () => {
     const requestBody = new BufferReadable(Buffer.from('via the proxy'));
-    const {response, body} = await proxyRequest(proxy, {method: 'PUT', headers: {host: backend.hostAndPort()}, path: '/'}, requestBody);
+    const {response, body} = await proxyRequest(proxy, {method: 'PUT', headers: {host: backend.url().host}, path: '/'}, requestBody);
     expect(body.toString()).toEqual('Hello via the proxy');
     expect(response.statusCode).toEqual(200);
   });
@@ -39,10 +39,9 @@ describe('proxy', () => {
  * HTTP request but with the hostname/port configured as per the proxy.
  */
 function proxyRequest(proxy: Proxy, options: http.RequestOptions, body?: stream.Readable): Promise<IResponseWithBody> {
+  const {hostname, port} = proxy.url();
   const proxyOptions: http.RequestOptions = {
-    ... options,
-    hostname: proxy.hostname(),
-    port: proxy.port(),
+    ... options, hostname, port,
   };
   return httpRequest(proxyOptions, body);
 }

@@ -46,8 +46,8 @@ export class Proxy {
     this.httpServer.on('connect', this.handleHttpConnect.bind(this));
 
     this.httpsServer = new ServerLifecycle(new https.Server(), {
-      port: 0,
       hostname: '127.0.0.1',
+      port: 0,
     });
     this.httpsServer.on(
       'request',

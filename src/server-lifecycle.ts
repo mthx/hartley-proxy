@@ -11,8 +11,10 @@ export interface IListenOptions {
 }
 
 export class ServerLifecycle {
-
-  constructor(private server: http.Server | https.Server, private options: IListenOptions) {
+  constructor(
+    private server: http.Server | https.Server,
+    private options: IListenOptions
+  ) {
     this.server = server;
     this.options = options;
   }
@@ -22,7 +24,7 @@ export class ServerLifecycle {
   }
 
   public listen(): Promise<void> {
-    const {port, hostname} = this.options;
+    const { port, hostname } = this.options;
     return new Promise((resolve, reject) => {
       this.server.listen(port, hostname, undefined, resolve);
     });
@@ -36,8 +38,7 @@ export class ServerLifecycle {
 
   public url(): url.Url | undefined {
     const protocol = this.server instanceof https.Server ? 'https:' : 'http:';
-    const {address, port} = this.server.address();
+    const { address, port } = this.server.address();
     return address ? url.parse(`${protocol}//${address}:${port}`) : undefined;
   }
-
 }

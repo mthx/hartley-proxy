@@ -1,8 +1,8 @@
-import { OutgoingHttpHeaders, ServerResponse } from "http";
+import { OutgoingHttpHeaders, ServerResponse } from 'http';
 
 export interface IHeaderMap {
-  [name: string]: string[]
-};
+  [name: string]: string[];
+}
 
 /**
  * Parses raw headers losslessly.  Normalises header case to lowercase.

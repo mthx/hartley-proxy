@@ -5,7 +5,11 @@ import * as stream from 'stream';
  */
 export class BufferWritable extends stream.Writable {
   private chunks: Buffer[] = [];
-  public _write(chunk: any, encoding: string, callback: (err?: Error) => void): void {
+  public _write(
+    chunk: any,
+    encoding: string,
+    callback: (err?: Error) => void
+  ): void {
     this.chunks.push(chunk);
     callback();
   }

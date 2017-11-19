@@ -8,7 +8,6 @@ import { httpRequest, IResponseWithBody } from '../src/http-request';
 import { parse as parseUrl } from 'url';
 
 describe.only('BackendServer', () => {
-
   const backend = new BackendServer();
 
   beforeEach(async () => await backend.listen());
@@ -22,9 +21,8 @@ describe.only('BackendServer', () => {
 
   it('appends request body to greeting', async () => {
     const input = new BufferReadable(Buffer.from('there!'));
-    const options = {... backend.url(), method: 'POST'};
+    const options = { ...backend.url(), method: 'POST' };
     const response = await httpRequest(options, input);
     expect(response.body.toString()).toEqual('Hello there!');
   });
-
 });

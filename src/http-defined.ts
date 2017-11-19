@@ -12,7 +12,11 @@ import * as url from 'url';
  * @param requestUrl The URL requested (possibly absolute).
  * @param hostHeader The host header.
  */
-export function effectiveRequestUrl(requestProtocol: string, requestUrl: string, hostHeader: string): url.Url {
+export function effectiveRequestUrl(
+  requestProtocol: string,
+  requestUrl: string,
+  hostHeader: string
+): url.Url {
   if (!requestProtocol.endsWith(':')) {
     throw new Error('Trailing colon required.');
   }
@@ -25,5 +29,7 @@ export function effectiveRequestUrl(requestProtocol: string, requestUrl: string,
     return parsed;
   }
 
-  return url.parse(url.resolve(requestProtocol + '//' + hostHeader, requestUrl));
+  return url.parse(
+    url.resolve(requestProtocol + '//' + hostHeader, requestUrl)
+  );
 }

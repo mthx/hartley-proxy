@@ -5,7 +5,8 @@ import { Proxy } from './proxy';
 async function app() {
   const proxy = new Proxy({ port: 8089 });
   await proxy.listen();
-  console.log('Listening on ' + proxy.port());
+  const { port } = proxy.url()!;
+  console.log('Listening on ' + port);
 }
 
 app();

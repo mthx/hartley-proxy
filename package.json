@@ -1,9 +1,9 @@
 {
-  "name": "mallory-glass",
+  "name": "hartley-proxy",
   "version": "0.1.0",
-  "description": "mallory-glass",
+  "description": "hartley-proxy",
   "license": "MIT",
-  "repository": "https://github.com/mthx/mallory-glass",
+  "repository": "https://github.com/mthx/hartley-proxy",
   "author": {
     "name": "Matt Hillsdon",
     "email": "matt@hillsdon.net",
@@ -30,20 +30,23 @@
     "watch:test": "jest --watch",
     "start": "ts-node src/cli.ts"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@types/node-forge": "^0.6.10",
+    "node-forge": "^0.7.1"
+  },
   "devDependencies": {
-    "@types/jest": "^20.0.5",
+    "@types/jest": "^21.1.8",
     "@types/node": "^8.0.0",
-    "coveralls": "^2.0.0",
-    "jest": "^20.0.4",
+    "coveralls": "^3.0.0",
+    "jest": "^21.2.1",
     "jest-environment-node-debug": "^2.0.0",
-    "prettier": "^1.5.2",
+    "prettier": "^1.8.2",
     "rimraf": "^2.0.0",
-    "ts-jest": "^20.0.7",
-    "ts-node": "^3.2.0",
-    "tslint": "^5.0.0",
-    "tslint-config-prettier": "^1.1.0",
-    "typescript": "^2.3.0"
+    "ts-jest": "^21.2.3",
+    "ts-node": "^3.3.0",
+    "tslint": "^5.8.0",
+    "tslint-config-prettier": "^1.6.0",
+    "typescript": "^2.6.1"
   },
   "engines": {
     "node": ">=6.0.0"
